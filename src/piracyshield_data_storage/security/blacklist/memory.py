@@ -34,7 +34,7 @@ class SecurityBlacklistMemory(DatabaseRedisDocument):
         """
         Verifies if an IP address is in the blacklist.
 
-        :param item: a valid IP address.
+        :param ip_address: a valid IP address.
         :return: returns the TTL of the item.
         """
 
@@ -53,7 +53,7 @@ class SecurityBlacklistMemory(DatabaseRedisDocument):
         """
         Removes an IP address from the blacklist.
 
-        :param item: a valid IP address.
+        :param ip_address: a valid IP address.
         :return: true if the item has been removed.
         """
 
@@ -64,6 +64,82 @@ class SecurityBlacklistMemory(DatabaseRedisDocument):
 
         except DatabaseRedisSetException:
             raise SecurityBlacklistMemorySetException()
+
+    def add_refresh_token(self, refresh_token: str, duration: int) -> bool | Exception:
+        """
+        Blacklists a refresh token.
+
+        :param refresh_token: an active refresh token.
+        :param duration: duration of the blacklist in seconds.
+        :return: true if the item has been stored.
+        """
+
+        try:
+            return self.set_with_expiry(
+                key = f'{self.token_prefix}:{refresh_token}',
+                value = '1',
+                expiry = duration
+            )
+
+        except DatabaseRedisSetException:
+            raise SecurityBlacklistMemorySetException()
+
+    def exists_by_refresh_token(self, refresh_token: str) -> bool | Exception:
+        """
+        Verifies if a refresh token is in the blacklist.
+
+        :param refresh_token: a valid refresh token.
+        :return: returns the TTL of the item.
+        """
+
+        try:
+            response = self.get(key = f'{self.token_prefix}:{refresh_token}')
+
+            if response:
+                return True
+
+            return False
+
+        except DatabaseRedisGetException:
+            raise SecurityBlacklistMemoryGetException()
+
+    def add_access_token(self, access_token: str, duration: int) -> bool | Exception:
+        """
+        Blacklists an access token.
+
+        :param access_token: an active access token.
+        :param duration: duration of the blacklist in seconds.
+        :return: true if the item has been stored.
+        """
+
+        try:
+            return self.set_with_expiry(
+                key = f'{self.token_prefix}:{access_token}',
+                value = '1',
+                expiry = duration
+            )
+
+        except DatabaseRedisSetException:
+            raise SecurityBlacklistMemorySetException()
+
+    def exists_by_access_token(self, access_token: str) -> bool | Exception:
+        """
+        Verifies if an access token is in the blacklist.
+
+        :param access_token: a valid access token.
+        :return: returns the TTL of the item.
+        """
+
+        try:
+            response = self.get(key = f'{self.token_prefix}:{access_token}')
+
+            if response:
+                return True
+
+            return False
+
+        except DatabaseRedisGetException:
+            raise SecurityBlacklistMemoryGetException()
 
 class SecurityBlacklistMemorySetException(Exception):
 
