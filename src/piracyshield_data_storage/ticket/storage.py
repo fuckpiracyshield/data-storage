@@ -63,6 +63,7 @@ class TicketStorage(DatabaseArangodbDocument):
 
             RETURN {{
                 'ticket_id': document.ticket_id,
+                'dda_id': document.dda_id,
                 'description': document.description,
                 'fqdn': document.fqdn,
                 'ipv4': document.ipv4,
@@ -131,6 +132,7 @@ class TicketStorage(DatabaseArangodbDocument):
 
             RETURN {{
                 'ticket_id': document.ticket_id,
+                'dda_id': document.dda_id,
                 'description': document.description,
                 'fqdn': document.fqdn,
                 'ipv4': document.ipv4,
@@ -141,7 +143,8 @@ class TicketStorage(DatabaseArangodbDocument):
                 }},
                 'settings': {{
                     'revoke_time': document.settings.revoke_time,
-                    'autoclose_time': document.settings.autoclose_time
+                    'autoclose_time': document.settings.autoclose_time,
+                    'report_error_time': document.settings.report_error_time
                 }}
             }}
         """
@@ -168,7 +171,7 @@ class TicketStorage(DatabaseArangodbDocument):
 
             FILTER
                 document.ticket_id == @ticket_id AND
-                document.status != 'created' AND
+                (document.status == 'open' OR document.status == 'closed') AND
                 POSITION(document.assigned_to, @account_id) == true
 
             LET ticket_items = (
@@ -197,7 +200,6 @@ class TicketStorage(DatabaseArangodbDocument):
 
             RETURN {{
                 'ticket_id': document.ticket_id,
-                'description': document.description,
                 'fqdn': fqdn_items[0] or [],
                 'ipv4': ipv4_items[0] or [],
                 'ipv6': ipv6_items[0] or [],
@@ -233,6 +235,8 @@ class TicketStorage(DatabaseArangodbDocument):
                 FILTER a.account_id == document.metadata.created_by
                 RETURN a['name']
             )[0]
+
+            SORT document.metadata.created_at DESC
 
             RETURN {{
                 'ticket_id': document.ticket_id,
@@ -272,6 +276,8 @@ class TicketStorage(DatabaseArangodbDocument):
 
             FILTER document.metadata.created_by == @account_id
 
+            SORT document.metadata.created_at DESC
+
             RETURN {{
                 'ticket_id': document.ticket_id,
                 'description': document.description,
@@ -307,7 +313,7 @@ class TicketStorage(DatabaseArangodbDocument):
             FOR document IN {self.collection_name}
 
             FILTER
-                document.status != 'created' AND
+                (document.status == 'open' OR document.status == 'closed') AND
                 POSITION(document.assigned_to, @account_id) == true
 
             LET ticket_items = (
@@ -334,9 +340,10 @@ class TicketStorage(DatabaseArangodbDocument):
             LET ipv4_items = (FOR item IN ticket_items FILTER item.genre == 'ipv4' RETURN item.items)
             LET ipv6_items = (FOR item IN ticket_items FILTER item.genre == 'ipv6' RETURN item.items)
 
+            SORT document.metadata.created_at DESC
+
             RETURN {{
                 'ticket_id': document.ticket_id,
-                'description': document.description,
                 'fqdn': fqdn_items[0] or [],
                 'ipv4': ipv4_items[0] or [],
                 'ipv6': ipv6_items[0] or [],
@@ -394,12 +401,12 @@ class TicketStorage(DatabaseArangodbDocument):
         except:
             raise TicketStorageGetException()
 
-    def update_task_list(self, ticket_id: str, task_id: str) -> Cursor | Exception:
+    def update_task_list(self, ticket_id: str, task_ids: list, updated_at: str) -> Cursor | Exception:
         """
         Appends a new task.
 
         :param ticket_id: ticket identifier.
-        :param task_id: task identifier.
+        :param task_ids: a list of tasks identifiers.
         :return: list of updated rows.
         """
 
@@ -407,7 +414,12 @@ class TicketStorage(DatabaseArangodbDocument):
             FOR document IN {self.collection_name}
             FILTER document.ticket_id == @ticket_id
 
-            UPDATE document WITH {{ "tasks": PUSH(document.tasks, @task_id) }} IN {self.collection_name}
+            UPDATE document WITH {{
+                "tasks": APPEND(document.tasks, @task_ids, true),
+                "metadata": {{
+                    "updated_at": @updated_at
+                }}
+            }} IN {self.collection_name}
 
             RETURN NEW
         """
@@ -417,7 +429,8 @@ class TicketStorage(DatabaseArangodbDocument):
                 aql,
                 bind_vars = {
                     'ticket_id': ticket_id,
-                    'task_id': task_id
+                    'task_ids': task_ids,
+                    'updated_at': updated_at
                 },
                 count = True
             )

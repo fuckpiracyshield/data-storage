@@ -4,6 +4,8 @@ from arango.exceptions import AQLQueryExecuteError
 
 class DatabaseArangodbDocument(DatabaseArangodbConnection):
 
+    max_batch_size = 50000
+
     def collection(self, collection):
         try:
             return self.instance.collection(collection)
@@ -13,7 +15,7 @@ class DatabaseArangodbDocument(DatabaseArangodbConnection):
 
     def query(self, aql, **kwargs):
         try:
-            return self.instance.aql.execute(aql, **kwargs)
+            return self.instance.aql.execute(aql, batch_size = self.max_batch_size, **kwargs)
 
         except AQLQueryExecuteError:
             raise DatabaseArangodbQueryException()

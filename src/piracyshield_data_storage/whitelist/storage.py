@@ -98,6 +98,33 @@ class WhitelistStorage(DatabaseArangodbDocument):
         except:
             raise WhitelistStorageGetException()
 
+    def get_active(self) -> Cursor | Exception:
+        """
+        Fetches the active whitelist items.
+
+        :return: cursor with the requested data.
+        """
+
+        aql = f"""
+            LET result = (
+                FOR document IN {self.collection_name}
+                    FILTER document.is_active == true
+                    COLLECT genre = document.genre INTO groupedDocuments
+                    RETURN {{
+                        'genre': genre,
+                        'values': groupedDocuments[*].document.value
+                    }}
+            )
+
+            RETURN MERGE(FOR r IN result RETURN {{[r.genre]: r.values}})
+        """
+
+        try:
+            return self.query(aql)
+
+        except:
+            raise WhitelistStorageGetException()
+
     def exists_by_value(self, value: str) -> Cursor | Exception:
         """
         Searches for an item.
@@ -109,7 +136,8 @@ class WhitelistStorage(DatabaseArangodbDocument):
         aql = f"""
             FOR document IN {self.collection_name}
 
-            FILTER document.value == @value
+            FILTER
+                document.value == @value
 
             RETURN document
         """

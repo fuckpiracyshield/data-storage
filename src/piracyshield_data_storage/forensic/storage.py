@@ -52,9 +52,7 @@ class ForensicStorage(DatabaseArangodbDocument):
 
             FILTER document.hash_string == @hash_string
 
-            COLLECT WITH COUNT INTO length
-
-            RETURN length
+            RETURN document
         """
 
         try:

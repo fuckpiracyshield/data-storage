@@ -86,6 +86,33 @@ class AccountStorage(DatabaseArangodbDocument):
         except:
             raise AccountStorageGetException()
 
+    def get_active(self) -> Cursor | Exception:
+        aql = f"""
+            FOR document IN {self.collection_name}
+
+            FILTER document.is_active == true
+
+            RETURN {{
+                'account_id': document.account_id,
+                'name': document.name,
+                'email': document.email,
+                'role': document.role
+            }}
+        """
+
+        try:
+            return self.query(aql)
+
+        except:
+            raise AccountStorageGetException()
+
+    def get_total(self) -> int | Exception:
+        try:
+            return self.collection_instance.count()
+
+        except:
+            raise AccountStorageGetException()
+
     def exists_by_identifier(self, identifier: str) -> Cursor | Exception:
         """
         Checks if an account with this identifier is in the collection.

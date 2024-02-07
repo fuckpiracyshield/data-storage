@@ -31,7 +31,7 @@ class AzureBlobStorage(BlobStorageDriver):
     def create_container(self):
         """
         Creates the container.
-        Currently used to mock a blob storage.
+        Currently used to create a mock blob storage.
         """
 
         return self.container_client.create_container()
@@ -79,7 +79,10 @@ class AzureBlobStorage(BlobStorageDriver):
 
             return True
 
-        except (ResourceNotFoundError, ResourceExistsError, AzureError):
+        except ResourceExistsError:
+            raise AzureBlobStorageAlreadyExistsException()
+
+        except (ResourceNotFoundError, AzureError):
             raise AzureBlobStorageUploadException()
 
     def get_list(self):
@@ -106,6 +109,14 @@ class AzureBlobStorage(BlobStorageDriver):
 
         except (ResourceNotFoundError, AzureError):
             raise AzureBlobStorageRemoveException()
+
+class AzureBlobStorageAlreadyExistsException(Exception):
+
+    """
+    The blob already exists.
+    """
+
+    pass
 
 class AzureBlobStorageUploadException(Exception):
 

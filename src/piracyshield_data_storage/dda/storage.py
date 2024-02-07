@@ -27,6 +27,75 @@ class DDAStorage(DatabaseArangodbDocument):
         except:
             raise DDAStorageCreateException()
 
+    def get_by_identifier(self, dda_id: str) -> Cursor | Exception:
+        """
+        Fetches a single DDA instance by its identifier.
+
+        :param dda_id: a valid DDA identifier.
+        :return: cursor with the requested data.
+        """
+
+        aql = f"""
+            FOR document IN {self.collection_name}
+
+            FILTER
+                document.dda_id == @dda_id
+
+            RETURN {{
+                'dda_id': document.dda_id,
+                'description': document.description,
+                'instance': document.instance,
+                'is_active': document.is_active,
+                'metadata': {{
+                    'created_at': document.metadata.created_at
+                }}
+            }}
+        """
+
+        try:
+            return self.query(aql, bind_vars = {
+                'dda_id': dda_id
+            })
+
+        except:
+            raise DDAStorageGetException()
+
+    def get_by_identifier_for_reporter(self, dda_id: str, reporter_id: str) -> Cursor | Exception:
+        """
+        Fetches a single DDA instance by its identifier for reporter.
+
+        :param dda_id: a valid DDA identifier.
+        :param account_id: a valid reporter identifier.
+        :return: cursor with the requested data.
+        """
+
+        aql = f"""
+            FOR document IN {self.collection_name}
+
+            FILTER
+                document.dda_id == @dda_id AND
+                document.account_id == @reporter_id
+
+            RETURN {{
+                'dda_id': document.dda_id,
+                'description': document.description,
+                'instance': document.instance,
+                'is_active': document.is_active,
+                'metadata': {{
+                    'created_at': document.metadata.created_at
+                }}
+            }}
+        """
+
+        try:
+            return self.query(aql, bind_vars = {
+                'dda_id': dda_id,
+                'reporter_id': reporter_id
+            })
+
+        except:
+            raise DDAStorageGetException()
+
     def get_global(self) -> Cursor | Exception:
         """
         Fetches all the DDA instances.

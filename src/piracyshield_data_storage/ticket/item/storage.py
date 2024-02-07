@@ -29,6 +29,20 @@ class TicketItemStorage(DatabaseArangodbDocument):
         except:
             raise TicketItemStorageCreateException()
 
+    def insert_many(self, documents: list) -> dict | Exception:
+        """
+        Adds a batch of new ticket items.
+
+        :param documents: a list of dictionary ticket items.
+        :return: cursor with the inserted data.
+        """
+
+        try:
+            return self.collection_instance.insert_many(documents)
+
+        except:
+            raise TicketItemStorageCreateException()
+
     def get_all_items_with_genre(self, genre: str) -> Cursor:
         """
         Gets all ticket items. Values only.
@@ -76,7 +90,7 @@ class TicketItemStorage(DatabaseArangodbDocument):
             FOR parent_ticket IN {self.ticket_collection_name}
                 FILTER
                     parent_ticket.ticket_id == document.ticket_id AND
-                    parent_ticket.status.ticket != 'created'
+                    (parent_ticket.status == 'open' OR parent_ticket.status == 'closed')
 
             RETURN DISTINCT document.value
         """
@@ -179,7 +193,7 @@ class TicketItemStorage(DatabaseArangodbDocument):
             FOR parent_ticket IN {self.ticket_collection_name}
                 FILTER
                     parent_ticket.ticket_id == document.ticket_id AND
-                    parent_ticket.status.ticket != 'created'
+                    (parent_ticket.status == 'open' OR parent_ticket.status == 'closed')
 
             RETURN DISTINCT document.value
         """
@@ -404,7 +418,13 @@ class TicketItemStorage(DatabaseArangodbDocument):
                 document.is_whitelisted == false AND
                 document.is_error == false
 
-            RETURN {{
+            // ensure only available tickets are considered
+            FOR parent_ticket IN {self.ticket_collection_name}
+                FILTER
+                    parent_ticket.ticket_id == document.ticket_id AND
+                    (parent_ticket.status == 'open' OR parent_ticket.status == 'closed')
+
+            RETURN DISTINCT {{
                 'value': document.value,
                 'status': document.status,
                 'timestamp': document.timestamp,
@@ -510,6 +530,37 @@ class TicketItemStorage(DatabaseArangodbDocument):
         except:
             raise TicketItemStorageGetException()
 
+    def get_active(self) -> Cursor | Exception:
+        """
+        Get all the ticket items without any unblocked items, grouped by genre.
+
+        :return: cursor with the requested data.
+        """
+
+        aql = f"""
+            LET result = (
+                FOR document IN {self.collection_name}
+
+                // filter out ticket items removed by reported errors
+                FILTER document.is_error == false
+
+                COLLECT genre = document.genre INTO groupedDocuments
+
+                RETURN {{
+                    'genre': genre,
+                    'values': UNIQUE(groupedDocuments[*].document.value)
+                }}
+            )
+
+            RETURN MERGE(FOR r IN result RETURN {{[r.genre]: r.values}})
+        """
+
+        try:
+            return self.query(aql)
+
+        except:
+            raise TicketItemStorageGetException()
+
     def exists_by_value(self, genre: str, value: str) -> Cursor | Exception:
         """
         Searches for a duplicate.
@@ -582,7 +633,7 @@ class TicketItemStorage(DatabaseArangodbDocument):
             FOR parent_ticket IN {self.ticket_collection_name}
                 FILTER
                     parent_ticket.ticket_id == document.ticket_id AND
-                    parent_ticket.status.ticket != 'created'
+                    (parent_ticket.status == 'open' OR parent_ticket.status == 'closed')
 
             UPDATE document WITH {{
                 status: @status,

@@ -12,19 +12,7 @@ class BlobStorage:
         self.driver = driver
 
     def upload(self, blob_name: str, file_path: str):
-        try:
-            return self.driver.upload(
-                blob_name = blob_name,
-                file_path = file_path
-            )
-
-        except:
-            raise BlobStorageUploadException()
-
-class BlobStorageUploadException(Exception):
-
-    """
-    Cannot upload the file.
-    """
-
-    pass
+        return self.driver.upload(
+            blob_name = blob_name,
+            file_path = file_path
+        )
